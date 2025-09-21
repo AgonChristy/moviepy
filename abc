@@ -1,0 +1,97 @@
+from moviepy.editor import *
+import pyttsx3
+from PIL import Image, ImageDraw, ImageFont
+import numpy as np
+import os
+
+# -------- STORY TEXT --------
+story_text = (
+    "It was a sunny afternoon at Sunrise Solutions, a bustling marketing firm. "
+    "In the glass-walled meeting room, the team had gathered for more than just another status update. "
+    "Maya, the energetic project manager, grinned mischievously as she adjusted the colorful cake on the table. "
+    "Mr. Kapoor, the respected yet approachable boss in his classic navy jacket, clapped his hands to get everyone's attention. "
+    "Next to him stood Priya, who had just completed her first big campaign - today was her work anniversary. "
+    "Riya, the team's creative wizard, whispered something funny to Priya, causing her to burst out laughing. "
+    "Arun, always the life of the party, waved a party popper in anticipation. "
+    "Sneha, who had quietly organized the celebration, watched the scene unfold, feeling proud that the team was closer than ever. "
+    "As the candles were lit, everyone started singing, and Priya's eyes sparkled with gratitude. "
+    "The cake was sliced, jokes were shared, and for a moment, deadlines and emails faded away - replaced by friendship and happiness. "
+    "In that short office celebration, Sunrise Solutions felt more like a family than ever."
+)
+
+# -------- FEMALE NARRATION (pyttsx3) --------
+narration_file = "narration_offline.mp3"
+engine = pyttsx3.init()
+voices = engine.getProperty('voices')
+
+# Try to pick a female voice if available
+for v in voices:
+    if "female" in v.name.lower() or "zira" in v.name.lower():
+        engine.setProperty('voice', v.id)
+        break
+
+engine.save_to_file(story_text, narration_file)
+engine.runAndWait()
+
+narration_audio = AudioFileClip(narration_file)
+
+# -------- SUBTITLES IMAGE (PIL) --------
+img_width, img_height = 1280, 250
+img = Image.new("RGB", (img_width, img_height), color="white")
+draw = ImageDraw.Draw(img)
+
+try:
+    font = ImageFont.truetype("DejaVuSans.ttf", 40)
+except:
+    font = ImageFont.load_default()
+
+# Wrap text for subtitles
+lines = []
+words = story_text.split(" ")
+line = ""
+for word in words:
+    test_line = line + word + " "
+    if draw.textlength(test_line, font=font) < (img_width - 40):
+        line = test_line
+    else:
+        lines.append(line)
+        line = word + " "
+lines.append(line)
+
+y_text = 20
+for l in lines:
+    draw.text((20, y_text), l, font=font, fill="black")
+    y_text += 50
+
+subtitle_img = np.array(img)
+subtitle_clip = ImageClip(subtitle_img).set_duration(narration_audio.duration).set_position(("center", "bottom"))
+
+# -------- BACKGROUND (replace with stock office images) --------
+image_files = [
+    "office1.jpg",  # <-- replace with your real stock images
+    "office2.jpg",
+    "office3.jpg"
+]
+
+# Make each image show for equal duration
+clips = []
+dur_per_img = narration_audio.duration / len(image_files)
+for img_file in image_files:
+    img_clip = ImageClip(img_file).set_duration(dur_per_img).resize((1280,720))
+    clips.append(img_clip)
+
+background = concatenate_videoclips(clips, method="compose")
+
+# -------- BACKGROUND MUSIC (optional) --------
+music = AudioFileClip("background_music.mp3").volumex(0.2)  # adjust volume
+
+# -------- FINAL VIDEO --------
+final_audio = CompositeAudioClip([narration_audio.volumex(1.0), music.set_duration(narration_audio.duration)])
+video = CompositeVideoClip([background, subtitle_clip]).set_duration(narration_audio.duration)
+video = video.set_audio(final_audio)
+
+# Export MP4
+output_file = "sunrise_solutions_offline.mp4"
+video.write_videofile(output_file, fps=24)
+
+print("✅ Video created:", output_file)
